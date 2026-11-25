@@ -1,0 +1,16 @@
+{
+  "name": "gate-verilog-hierarchy",
+  "productName": "GATE Verilog 계층도 생성기",
+  "version": "0.1.0",
+  "description": "Verilog 코드에서 모듈 정의와 인스턴스 관계를 분석해 계층도를 생성하는 데스크톱 프로그램 (간이 분석, 일부 문법만 지원)",
+  "main": "main.js",
+  "private": true,
+  "license": "SEE LICENSE IN LICENSE.md",
+  "scripts": {
+    "start": "electron .",
+    "test": "node test/check.js && node test/check_sim.js && node test/check_tb.js && node test/check_tree.js && node test/check_ports.js && node test/check_circuit.js"
+  },
+  "devDependencies": {
+    "electron": "^45.5.0"
+  }
+}

@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GATE Verilog 계층도 생성기</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="app">
+  <header class="topbar">
+    <div class="topbar-text">
+      <h1>GATE Verilog 계층도 생성기</h1>
+      <p>Verilog 코드에서 모듈 인스턴스 계층도를 만듭니다.</p>
+    </div>
+    <button id="btnHelp" type="button" class="btn btn-secondary" aria-haspopup="dialog">지원 문법 안내</button>
+  </header>
+
+  <main class="layout">
+    <section class="panel-card left" aria-labelledby="listTitle">
+      <div class="list-head">
+        <h2 id="listTitle" class="panel-title">분석 목록</h2>
+        <div class="menu-wrap">
+          <button id="btnNew" type="button" class="btn btn-primary btn-small" aria-haspopup="menu" aria-expanded="false" aria-controls="newMenu">+ 새 분석</button>
+          <div id="newMenu" class="menu" role="menu" hidden>
+            <div class="menu-group">단일 소스</div>
+            <button id="miSingleFile" type="button" role="menuitem">파일 불러오기</button>
+            <button id="miSinglePaste" type="button" role="menuitem">직접 입력(붙여넣기)</button>
+            <div class="menu-group">통합 설계</div>
+            <button id="miDesign" type="button" role="menuitem">이름을 정해 묶음 만들기</button>
+          </div>
+        </div>
+      </div>
+      <ul id="itemList" class="itemlist" aria-label="분석 목록"></ul>
+      <p class="persist-note" id="persistNote">현재 분석 목록은 저장되지 않으며 앱 종료 시 사라집니다. 불러온 원본 파일은 수정·삭제하지 않으며, 목록에서 제거해도 그대로입니다.</p>
+      <details class="limits-note">
+        <summary>입력 안내와 제한</summary>
+        <ul>
+          <li>파일은 UTF-8로 읽습니다. 다른 인코딩이면 한글 주석 등이 깨질 수 있습니다(깨진 글자가 있으면 파일 정보에 표시).</li>
+          <li>파일 하나가 2MB를 넘으면 불러오지 않고, 약 30만 자를 넘으면 분석하지 못합니다.</li>
+          <li>선택할 수 있는 확장자는 <code>.v</code>, <code>.sv</code> 입니다(<code>.vh</code> 헤더는 지원하지 않음). 폴더 전체 불러오기는 지원하지 않습니다.</li>
+          <li><code>.sv</code>를 선택할 수 있다는 것이 SystemVerilog 문법 지원을 뜻하지 않습니다. 지원하지 않는 문법은 누락·오인식될 수 있습니다.</li>
+          <li><code>`include</code> 대상 파일은 자동으로 찾지도 분석하지도 않습니다. 필요한 파일은 직접 추가하세요. 매크로·generate 등 파서의 한계는 그대로입니다.</li>
+        </ul>
+      </details>
+      <div class="src-head">
+        <h2 id="srcTitle" class="panel-title">소스</h2>
+        <span id="srcName" class="src-name"></span>
+      </div>
+      <textarea id="input" spellcheck="false" aria-labelledby="srcTitle"></textarea>
+      <div id="srcEmpty" class="src-empty" hidden></div>
+      <div id="srcNotes" class="src-notes" aria-live="polite"></div>
+      <div id="intakeMsg" class="intake" role="status" aria-live="polite"></div>
+      <input type="file" id="filePick" accept=".v,.sv" hidden>
+      <div class="controls">
+        <button id="btnAnalyze" type="button" class="btn btn-primary">코드 분석</button>
+        <div class="field">
+          <label for="topSel">최상위 모듈</label>
+          <select id="topSel" disabled><option>(먼저 코드를 분석하세요)</option></select>
+        </div>
+        <button id="btnShow" type="button" class="btn btn-primary" disabled>계층도 생성</button>
+      </div>
+    </section>
+
+    <section class="panel-card right">
+      <div class="tabs" role="tablist" aria-label="결과 보기">
+        <button id="tabTree" type="button" role="tab" aria-selected="true" class="tab on">계층도</button>
+        <button id="tabCirc" type="button" role="tab" aria-selected="false" class="tab">회로도</button>
+        <button id="tabResult" type="button" role="tab" aria-selected="false" class="tab">인식 결과</button>
+        <button id="tabNets" type="button" role="tab" aria-selected="false" class="tab">신호 연결</button>
+        <button id="tabTb" type="button" role="tab" aria-selected="false" class="tab">테스트벤치</button>
+      </div>
+      <div class="summary" id="summary" aria-live="polite">
+        <div class="metrics" id="metrics"></div>
+        <div class="status" id="status">Verilog 코드를 입력하고 분석해 주세요.</div>
+      </div>
+      <div class="bar" id="resultBar" style="display:none">
+        <button id="btnCopyMd" type="button" class="btn btn-secondary btn-small" disabled>Markdown 복사</button>
+        <span id="copyMsg" role="status" aria-live="polite"></span>
+      </div>
+      <div class="treewrap" id="wrapTree">
+        <div class="view" id="panelTree"><div class="empty">분석 후 최상위 모듈을 선택하고 ‘계층도 생성’을 눌러 주세요.</div></div>
+        <div id="detailSplit" class="splitter" role="separator" aria-orientation="vertical" tabindex="0" aria-label="상세 패널 폭 조절(끌거나 좌우 화살표 키, 더블클릭: 기본 폭)" title="끌어서 상세 패널 폭 조절 · 더블클릭: 기본 폭" style="display:none"></div>
+        <aside class="detail" id="detail" aria-labelledby="detailTitle" style="display:none">
+          <div class="detail-head">
+            <h2 id="detailTitle" tabindex="-1">모듈 상세</h2>
+            <button id="btnDetailClose" type="button" class="btn btn-secondary btn-small">닫기</button>
+          </div>
+          <div class="detail-actions">
+            <button id="btnDetailFocus" type="button" class="btn btn-secondary btn-small">이 모듈 중심으로 보기(부분 계층)</button>
+            <button id="btnDetailNets" type="button" class="btn btn-secondary btn-small">이 모듈의 신호 연결 보기</button>
+            <button id="btnDetailCirc" type="button" class="btn btn-secondary btn-small">이 모듈의 회로 변환 보기(Yosys)</button>
+          </div>
+          <div class="detail-body" id="detailBody"></div>
+        </aside>
+      </div>
+      <div class="view" id="panelResult" style="display:none"><div class="empty">아직 분석한 결과가 없습니다.</div></div>
+      <div class="view" id="panelNets" style="display:none"><div class="empty">먼저 코드를 분석해 주세요.</div></div>
+      <div class="view" id="panelTb" style="display:none"><div class="empty">먼저 코드를 분석해 주세요.</div></div>
+      <div class="view" id="panelCirc" style="display:none"><div class="empty">먼저 코드를 분석해 주세요.</div></div>
+      <div class="legend" id="legend">화살표는 모듈 인스턴스화 관계를 의미합니다. 데이터 흐름이나 신호 연결이 아닙니다. 점선 블록은 정의 미제공 또는 재귀(펼치지 않음)입니다. 블록을 한 번 누르면 선택, 두 번 누르거나 Enter를 누르거나 ▸/▾ 버튼을 누르면 직접 하위 인스턴스를 펼치거나 접습니다(오른쪽/왼쪽 화살표 키도 가능). 원본 코드와 파일·줄 정보는 블록의 ⓘ 버튼(또는 i 키)으로 엽니다. 펼침 상태는 인스턴스 경로별로 따로 유지됩니다.</div>
+    </section>
+  </main>
+</div>
+
+<dialog id="nameDialog" aria-labelledby="nameTitle">
+  <form method="dialog" class="dlg" id="nameForm">
+    <div class="dlg-head"><h2 id="nameTitle">이름 입력</h2></div>
+    <div class="dlg-body">
+      <label for="nameInput" id="nameLabel">이름</label>
+      <input id="nameInput" type="text" autocomplete="off" spellcheck="false">
+      <div id="nameErr" class="dlg-err" role="alert"></div>
+      <div class="dlg-actions">
+        <button type="button" id="nameCancel" class="btn btn-secondary btn-small">취소</button>
+        <button type="submit" id="nameOk" class="btn btn-primary btn-small">확인</button>
+      </div>
+    </div>
+  </form>
+</dialog>
+
+<div id="ctxMenu" class="menu ctx" role="menu" aria-label="통합 설계 메뉴" hidden>
+  <button id="cmFile" type="button" role="menuitem">파일 불러오기</button>
+  <button id="cmWrite" type="button" role="menuitem">소스 직접 작성</button>
+</div>
+
+<dialog id="composeDialog" aria-labelledby="composeTitle">
+  <form method="dialog" class="dlg" id="composeForm">
+    <div class="dlg-head"><h2 id="composeTitle">소스 직접 작성</h2></div>
+    <div class="dlg-body">
+      <p id="composeTarget" class="dlg-note"></p>
+      <label for="composeName">파일명 (.v 또는 .sv)</label>
+      <input id="composeName" type="text" autocomplete="off" spellcheck="false" placeholder="chip_top.v">
+      <label for="composeCode">코드</label>
+      <textarea id="composeCode" spellcheck="false" rows="12"></textarea>
+      <div id="composeErr" class="dlg-err" role="alert"></div>
+      <p class="dlg-meta">디스크에 파일을 만들지 않고, 앱 안의 소스로만 추가합니다. 앱 종료 시 사라집니다.</p>
+      <div class="dlg-actions">
+        <button type="button" id="composeCancel" class="btn btn-secondary btn-small">취소</button>
+        <button type="submit" id="composeOk" class="btn btn-primary btn-small">추가</button>
+      </div>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="dupDialog" aria-labelledby="dupTitle">
+  <form method="dialog" class="dlg" id="dupForm">
+    <div class="dlg-head"><h2 id="dupTitle">같은 이름의 파일이 있습니다</h2></div>
+    <div class="dlg-body">
+      <p class="dlg-note">파일 경로를 알 수 없어 같은 파일인지 확정할 수 없습니다. 항목마다 선택하세요. 별도 소스로 추가해도 원래 파일명과 코드의 모듈명은 바뀌지 않습니다.</p>
+      <div id="dupList"></div>
+      <div class="dlg-actions">
+        <button type="button" id="dupCancel" class="btn btn-secondary btn-small">취소(모두 건너뛰기)</button>
+        <button type="submit" id="dupOk" class="btn btn-primary btn-small">적용</button>
+      </div>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="confirmDialog" aria-labelledby="confirmTitle">
+  <form method="dialog" class="dlg">
+    <div class="dlg-head"><h2 id="confirmTitle">확인</h2></div>
+    <div class="dlg-body">
+      <p id="confirmMsg" class="dlg-note"></p>
+      <div class="dlg-actions">
+        <button type="button" id="confirmNo" class="btn btn-secondary btn-small">취소</button>
+        <button type="submit" id="confirmYes" class="btn btn-primary btn-small">제거</button>
+      </div>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="helpDialog" aria-labelledby="helpTitle">
+  <div class="dlg">
+    <div class="dlg-head">
+      <h2 id="helpTitle">지원 문법 안내</h2>
+      <button id="btnHelpClose" type="button" class="btn btn-secondary btn-small">닫기</button>
+    </div>
+    <div class="dlg-body">
+      <h3>지원 (첫 버전)</h3>
+      <ul>
+        <li><code>module ~ endmodule</code> 정의, 여러 모듈을 한 입력창에 붙여넣기</li>
+        <li>이름 기반 포트 연결 인스턴스<br><code>모듈명 [#(...)] 인스턴스명 (.포트(신호), ...);</code></li>
+        <li>선언문당 인스턴스 1개, 같은 모듈의 여러 인스턴스는 각각 별도 블록</li>
+        <li><code>//</code> 및 <code>/* */</code> 주석 무시</li>
+        <li>선택한 최상위 모듈 아래의 인스턴스 경로를 따라 계층 구성</li>
+      </ul>
+      <h3>제한 (지원하지 않음)</h3>
+      <ul>
+        <li>generate / genvar 내부 인스턴스</li>
+        <li>매크로, <code>`ifdef</code>, <code>`include</code> 등 컴파일러 지시어</li>
+        <li>SystemVerilog 문법 (interface, package, logic 등)</li>
+        <li>게이트 프리미티브(and, or 등)는 모듈로 취급하지 않음</li>
+        <li>위치 기반 포트 연결·인스턴스 배열은 관계만 인식(확인 필요)</li>
+        <li>입력 코드에 정의가 없는 모듈은 ‘정의 미제공’으로 표시하고 펼치지 않음</li>
+        <li>신호 연결 탭은 단일 신호명 연결만 표시(비트 선택·연산식·상수·위치 기반은 제외, 하위 계층을 관통하는 추적 없음, assign/always 구동 분석 없음). 자세한 제한은 ‘신호 연결’ 탭에서 확인</li>
+        <li>저장 기능 없음</li>
+      </ul>
+      <p class="dlg-note">모든 Verilog 문법을 지원하지 않습니다. 분석 후 <b>‘인식 결과’</b> 탭에서 모듈·인스턴스 목록을 코드와 대조하세요.</p>
+    </div>
+  </div>
+</dialog>
+
+<script src="sample.js"></script>
+<script src="analyzer.js"></script>
+<script src="design.js"></script>
+<script src="nets.js"></script>
+<script src="markdown.js"></script>
+<script src="layout.js"></script>
+<script src="treeview.js"></script>
+<script src="portinfo.js"></script>
+<script src="blockview.js"></script>
+<script src="netgraph.js"></script>
+<script src="graphview.js"></script>
+<script src="vcd.js"></script>
+<script src="playback.js"></script>
+<script src="tbanalyze.js"></script>
+<script src="tbview.js"></script>
+<script src="netlist.js"></script>
+<script src="circlayout.js"></script>
+<script src="circview.js"></script>
+<script src="renderer.js"></script>
+<script src="splitter.js"></script>
+</body>
+</html>

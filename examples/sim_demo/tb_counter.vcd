@@ -1,0 +1,96 @@
+$comment
+  수작업으로 만든 fixture 입니다. 실제 시뮬레이터가 출력한 파일이 아닙니다.
+  tb_counter.v 의 동작을 손으로 따라가 쓴 작은 예제이며, 이 앱의 VCD 재생 기능을 확인하기 위한 용도입니다.
+$end
+$version Hand-written fixture (not simulator output) $end
+$timescale 1ns $end
+$scope module tb_counter $end
+$var reg 1 ! clk $end
+$var reg 1 " rst_n $end
+$var reg 1 # en $end
+$var wire 4 $ count [3:0] $end
+$var wire 1 % done $end
+$scope module u_dut $end
+$var wire 1 ! clk $end
+$var wire 1 " rst_n $end
+$var wire 1 # en $end
+$var wire 4 $ count [3:0] $end
+$var wire 1 % done $end
+$scope module u_cnt $end
+$var wire 1 ! clk $end
+$var wire 1 " rst_n $end
+$var wire 1 # en $end
+$var reg 4 $ q [3:0] $end
+$upscope $end
+$scope module u_cmp $end
+$var wire 4 $ value [3:0] $end
+$var wire 1 % hit $end
+$upscope $end
+$upscope $end
+$upscope $end
+$enddefinitions $end
+#0
+$dumpvars
+0!
+x"
+z#
+bxxxx $
+x%
+$end
+#5
+1!
+#10
+0!
+0"
+b0000 $
+0%
+#15
+1!
+0#
+#20
+0!
+#25
+1!
+#30
+0!
+1"
+#35
+1!
+#40
+0!
+1#
+#45
+1!
+b0001 $
+#50
+0!
+#55
+1!
+b0010 $
+#60
+0!
+#65
+1!
+b0011 $
+#70
+0!
+#75
+1!
+b0100 $
+#80
+0!
+#85
+1!
+b0101 $
+1%
+#90
+0!
+#95
+1!
+b0110 $
+0%
+#100
+0!
+#105
+1!
+b0111 $
