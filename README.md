@@ -1,2 +1,2 @@
 # GATE
-GATE동아리
+Verilog program
